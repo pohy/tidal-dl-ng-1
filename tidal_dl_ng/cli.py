@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
-from config import HandlingApp
+from tidal_dl_ng.config import HandlingApp
 from rich.console import Group
 from rich.live import Live
 from rich.progress import (
@@ -155,6 +155,8 @@ def _download(ctx: typer.Context, urls: list[str], try_login: bool = True) -> bo
                     else:
                         item_ids.append(item_id)
 
+                    quality_audio = Quality(settings.data.quality_audio)
+
                     for item_id in item_ids:
                         # Exit loop if abort signal is set.
                         if handling_app.event_abort.is_set():
@@ -166,6 +168,7 @@ def _download(ctx: typer.Context, urls: list[str], try_login: bool = True) -> bo
                             file_template=file_template,
                             video_download=ctx.obj[CTX_TIDAL].settings.data.video_download,
                             download_delay=settings.data.download_delay,
+                            quality_audio=quality_audio,
                         )
         finally:
             # Clear and stop progress display

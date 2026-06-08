@@ -37,34 +37,46 @@ def name_builder_item(media: Track | Video) -> str:
     return f"{name_builder_artist(media)} - {name_builder_title(media)}"
 
 
-def get_tidal_media_id(url_or_id_media: str) -> str:
-    id_dirty = url_or_id_media.rsplit("/", 1)[-1]
-    id_media = id_dirty.rsplit("?", 1)[0]
+_MEDIA_TYPE_NAMES: dict[str, MediaType] = {t.value: t for t in MediaType}
 
-    return id_media
+
+def _parse_tidal_url(url: str) -> tuple[str | None, str | None]:
+    """Parse a TIDAL URL and return (media_type_name, media_id).
+
+    Handles URLs like:
+        https://tidal.com/track/160072999
+        https://tidal.com/browse/track/160072999
+        https://tidal.com/track/160072999/u
+        https://tidal.com/track/160072999?query=param
+    """
+    # Strip query string
+    url_clean = url.split("?", 1)[0].rstrip("/")
+    segments = url_clean.split("/")
+
+    # Walk segments to find a known media type followed by an ID
+    for i, seg in enumerate(segments):
+        if seg in _MEDIA_TYPE_NAMES and i + 1 < len(segments):
+            return seg, segments[i + 1]
+
+    return None, None
+
+
+def get_tidal_media_id(url_or_id_media: str) -> str:
+    _, media_id = _parse_tidal_url(url_or_id_media)
+    if media_id:
+        return media_id
+
+    # Fallback for bare IDs
+    id_dirty = url_or_id_media.rsplit("/", 1)[-1]
+    return id_dirty.rsplit("?", 1)[0]
 
 
 def get_tidal_media_type(url_media: str) -> MediaType | bool:
-    result: MediaType | bool = False
-    url_split = url_media.split("/")[-2]
+    media_type_name, _ = _parse_tidal_url(url_media)
+    if media_type_name:
+        return _MEDIA_TYPE_NAMES[media_type_name]
 
-    if len(url_split) > 1:
-        media_name = url_media.split("/")[-2]
-
-        if media_name == "track":
-            result = MediaType.TRACK
-        elif media_name == "video":
-            result = MediaType.VIDEO
-        elif media_name == "album":
-            result = MediaType.ALBUM
-        elif media_name == "playlist":
-            result = MediaType.PLAYLIST
-        elif media_name == "mix":
-            result = MediaType.MIX
-        elif media_name == "artist":
-            result = MediaType.ARTIST
-
-    return result
+    return False
 
 
 def search_results_all(session: Session, needle: str, types_media: SearchTypes = None) -> dict[str, [SearchTypes]]:
