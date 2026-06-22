@@ -113,7 +113,7 @@ class Download:
                 "be set in (`path_binary_ffmpeg`)."
             )
 
-    def _download(
+    def _download(  # noqa: C901
         self,
         media: Track | Video,
         path_file: pathlib.Path,
@@ -243,6 +243,7 @@ class Download:
         except Exception:
             if dl_segment_result is not dl_segment_results[-1]:
                 result = False
+                self.fn_logger.exception("Error while merging downloaded segments.")
 
         return result
 
@@ -318,7 +319,7 @@ class Download:
 
         return result
 
-    def item(
+    def item(  # noqa: C901
         self,
         file_template: str,
         media: Track | Video = None,
@@ -345,8 +346,10 @@ class Download:
                     # Re-create media instance with full album information
                     media = self.session.track(media.id, with_album=True)
             elif not media:
-                raise MediaMissing
-        except:
+                raise MediaMissing  # noqa: TRY301
+        except Exception:
+            self.fn_logger.exception("Could not prepare media for download. Skipping.")
+
             return False, ""
 
         # If video download is not allowed end here
@@ -419,7 +422,7 @@ class Download:
 
                     return False, ""
                 except Exception:
-                    self.fn_logger.exception(f"Something went wrong. Skipping '{name_builder_item(media)}'.")
+                    self.fn_logger.exception(f"Could not retrieve stream for '{name_builder_item(media)}'. Skipping.")
 
                     return False, ""
 
@@ -703,7 +706,7 @@ class Download:
 
         return result, path_lyrics, path_cover
 
-    def items(
+    def items(  # noqa: C901
         self,
         file_template: str,
         media: Album | Playlist | UserPlaylist | Mix = None,

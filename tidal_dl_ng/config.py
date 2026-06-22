@@ -41,7 +41,7 @@ class BaseConfig:
         value_old: Any = getattr(self.data, key)
 
         if type(value_old) == bool:  # noqa: E721
-            value = True if value.lower() in ("true", "1", "yes", "y") else False  # noqa: SIM210
+            value = value if isinstance(value, bool) else str(value).lower() in ("true", "1", "yes", "y")
         elif type(value_old) == int and type(value) != int:  # noqa: E721
             value = int(value)
 
@@ -116,8 +116,11 @@ class Tidal(BaseConfig, metaclass=SingletonMeta):
 
         return True
 
-    def login_token(self, do_pkce: bool = False) -> bool:
+    def login_token(self, do_pkce: bool = True) -> bool:
         result = False
+        # Honor the auth type the stored token was minted with. Legacy OAuth tokens
+        # (is_pkce=False) cannot stream playback anymore (TIDAL returns subStatus 4005).
+        do_pkce = self.data.is_pkce if self.token_from_storage else do_pkce
         self.is_pkce = do_pkce
 
         if self.token_from_storage:
@@ -155,11 +158,18 @@ class Tidal(BaseConfig, metaclass=SingletonMeta):
         self.set_option("access_token", self.session.access_token)
         self.set_option("refresh_token", self.session.refresh_token)
         self.set_option("expiry_time", self.session.expiry_time)
+        self.set_option("is_pkce", self.session.is_pkce)
         self.save()
 
     def login(self, fn_print: Callable) -> bool:
         is_token = self.login_token()
         result = False
+
+        # A legacy (non-PKCE) token may still validate but can no longer stream
+        # playback (TIDAL subStatus 4005). Force a PKCE re-login in that case.
+        if is_token and self.token_from_storage and not self.data.is_pkce:
+            fn_print("Your stored token is a legacy token that can no longer stream. Re-authenticating...")
+            is_token = False
 
         if is_token:
             fn_print("Yep, looks good! You are logged in.")
@@ -168,10 +178,11 @@ class Tidal(BaseConfig, metaclass=SingletonMeta):
         elif not is_token:
             fn_print("You either do not have a token or your token is invalid.")
             fn_print("No worries, we will handle this...")
-            # Login method: Device linking
-            self.session.login_oauth_simple(fn_print)
-            # Login method: PKCE authorization (was necessary for HI_RES_LOSSLESS streaming earlier)
-            # self.session.login_pkce(fn_print)
+            # Login method: PKCE authorization. Required for playback/streaming;
+            # legacy device-linking (login_oauth_simple) now yields subStatus 4005.
+            self.session.login_pkce(fn_print)
+            # Login method: Device linking (legacy, no longer grants playback)
+            # self.session.login_oauth_simple(fn_print)
 
             is_login = self.login_finalize()
 

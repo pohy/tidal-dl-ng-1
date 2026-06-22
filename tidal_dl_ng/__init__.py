@@ -7,7 +7,11 @@ import requests
 import toml
 
 from tidal_dl_ng.constants import REQUESTS_TIMEOUT_SEC
+from tidal_dl_ng.helper.mpd_compat import apply as _apply_mpd_compat
 from tidal_dl_ng.model.meta import ProjectInformation, ReleaseLatest
+
+# Patch mpegdash to tolerate TIDAL's non-spec MPEG-DASH manifests.
+_apply_mpd_compat()
 
 
 def metadata_project() -> ProjectInformation:

@@ -108,3 +108,4 @@ class Token:
     access_token: str | None = None
     refresh_token: str | None = None
     expiry_time: float = 0.0
+    is_pkce: bool = False
